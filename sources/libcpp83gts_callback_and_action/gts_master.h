@@ -1,6 +1,7 @@
 #ifndef __gts_master_h__
 #define __gts_master_h__
 
+#include <string>
 #include <FL/Fl_Value_Input.H>
 #include "fltk_event.h"
 
@@ -43,6 +44,15 @@ public:
 	void i_pv_sw( int sw );
 	int  i_cv_sw( void ) const;
 	void i_cv_sw( int sw );
+
+	/* REST API server (see gts_rest_api.h). port 0 = disabled */
+	void api_port( const int port ) { this->_api_port = port; }
+	void api_host( const std::string& host ) { this->_api_host = host; }
+	void api_token( const std::string& token ) { this->_api_token = token; }
+	int api_port( void ) const { return this->_api_port; }
+	/* no GUI windows; requires the REST API */
+	void headless( const bool sw ) { this->_headless = sw; }
+	bool headless( void ) const { return this->_headless; }
 
 	const char *const cp_release_name( void ) const;
 	const char *const cp_release_date( void ) const;
@@ -167,6 +177,10 @@ private:
 	const char	*const _cp_release_name,
 			*const _cp_release_date,
 			*const _cp_release_number;
+
+	int _api_port;
+	std::string _api_host, _api_token;
+	bool _headless;
 
 	int	_i_enable_act_menu_sw,
 		_i_enable_act_key_event_sw;

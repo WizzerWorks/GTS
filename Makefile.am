@@ -24,6 +24,7 @@ libgts_la_CPPFLAGS = \
 				   -Isources/libcpp71iip_trace_by_hsv \
 				   -Isources/libcpp72iip_erase_dot_noise \
 				   -Isources/libcpp83gts_callback_and_action \
+				   -Ithirdparty/cpp-httplib \
 				   $(TIFF_CFLAGS) \
 				   $(FLTK_CPPFLAGS) \
 				   $(GLEW_CFLAGS)
@@ -113,6 +114,7 @@ libgts_la_SOURCES = \
 					sources/libcpp83gts_callback_and_action/gts_file_path.cpp \
 					sources/libcpp83gts_callback_and_action/gts_gui.cpp \
 					sources/libcpp83gts_callback_and_action/gts_master.cpp \
+					sources/libcpp83gts_callback_and_action/gts_rest_api.cpp \
 					sources/libcpp83gts_callback_and_action/cb_area_and_rot90.cpp \
 					sources/libcpp83gts_callback_and_action/cb_change_view.cpp \
 					sources/libcpp83gts_callback_and_action/cb_color_trace_view_area.cpp \

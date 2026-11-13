@@ -34,6 +34,7 @@ endif()
 # ---------------------------------------------------------------------------
 pkg_check_modules(TIFF REQUIRED IMPORTED_TARGET libtiff-4)
 pkg_check_modules(GLEW REQUIRED IMPORTED_TARGET glew)
+set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(OpenGL REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -169,6 +170,7 @@ set(GTS_SOURCES
     sources/libcpp83gts_callback_and_action/gts_file_path.cpp
     sources/libcpp83gts_callback_and_action/gts_gui.cpp
     sources/libcpp83gts_callback_and_action/gts_master.cpp
+    sources/libcpp83gts_callback_and_action/gts_rest_api.cpp
     sources/libcpp83gts_callback_and_action/cb_area_and_rot90.cpp
     sources/libcpp83gts_callback_and_action/cb_change_view.cpp
     sources/libcpp83gts_callback_and_action/cb_color_trace_view_area.cpp
@@ -279,6 +281,7 @@ target_include_directories(gts_lib PUBLIC
   sources/libcpp71iip_trace_by_hsv
   sources/libcpp72iip_erase_dot_noise
   sources/libcpp83gts_callback_and_action
+  thirdparty/cpp-httplib
 )
 
 target_compile_definitions(gts_lib PUBLIC

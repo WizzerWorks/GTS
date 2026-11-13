@@ -31,6 +31,10 @@ pri_funct_msg_vr( " -version : print VERSION");
 pri_funct_msg_vr( " -help    : print HELP");
 pri_funct_msg_vr( " -bv      : Basic Verbose on");
 pri_funct_msg_vr( " -cv      : Counter Verbose on");
+pri_funct_msg_vr( " -api-port N   : start the REST API server on port N");
+pri_funct_msg_vr( " -api-host H   : REST API bind address (default 127.0.0.1)");
+pri_funct_msg_vr( " -api-token T  : REST API requires 'Authorization: Bearer T'");
+pri_funct_msg_vr( " -headless     : no windows (needs -api-port)");
 pri_funct_msg_vr( "File Format");
 pri_funct_msg_vr( " TIFF          (8,16bits)(.tif)" );
 pri_funct_msg_vr( " Targa            (8bits)(.tga,.TGA)" );
@@ -54,6 +58,36 @@ static int argument_analyzer( int argc, char *argv[], char *cp_comm, gts_master 
 		else if (!strcmp( argv[ii], "-cv" )) {
 			clp_master->i_cv_sw( ON );
 		}
+		else if (!strcmp( argv[ii], "-api-port" )
+		||       !strcmp( argv[ii], "-api-host" )
+		||       !strcmp( argv[ii], "-api-token" )) {
+			if (ii + 1 >= argc) {
+				pri_funct_err_bttvr(
+					"Error: option<%s> needs a value", argv[ii] );
+				return NG;
+			}
+			const char *opt = argv[ii];
+			const char *val = argv[++ii];
+			if (!strcmp( opt, "-api-port" )) {
+				char *end = nullptr;
+				const long port = strtol( val, &end, 10 );
+				if (*end != '\0' || port < 1 || 65535 < port) {
+					pri_funct_err_bttvr(
+						"Error: bad port<%s>", val );
+					return NG;
+				}
+				clp_master->api_port( (int)port );
+			}
+			else if (!strcmp( opt, "-api-host" )) {
+				clp_master->api_host( val );
+			}
+			else {
+				clp_master->api_token( val );
+			}
+		}
+		else if (!strcmp( argv[ii], "-headless" )) {
+			clp_master->headless( true );
+		}
 
 		else if ('-' == argv[ii][0]) {
 			pri_funct_err_bttvr(
@@ -67,6 +101,10 @@ static int argument_analyzer( int argc, char *argv[], char *cp_comm, gts_master 
 			print_help( cp_comm, clp_master );
 			return NG;
 		}
+	}
+	if (clp_master->headless() && clp_master->api_port() <= 0) {
+		pri_funct_err_bttvr( "Error: -headless needs -api-port" );
+		return NG;
 	}
 	return OK;
 }

@@ -50,9 +50,24 @@ void cb_sane_device_cancel(Fl_Widget *w, void *data) {
     devices_win->hide();
 }
 
+/* When not interactive (headless / REST API) no dialog may be opened:
+nobody can dismiss it. Messages go to stderr instead. */
+static bool non_interactive_sw = false;
+void iip_scan::set_non_interactive(const bool sw) { non_interactive_sw = sw; }
+static void message_(const char *fmt, const char *arg)
+{
+    if (non_interactive_sw) {
+        fprintf(stderr, fmt, arg);
+        fputc('\n', stderr);
+    } else {
+        fl_message(fmt, arg);
+    }
+}
+
 Fl_Window *progress_win = NULL;
 Fl_Box *progress_win_box = NULL;
 void show_progress_win(const char *label) {
+    if (non_interactive_sw) { return; }
     int win_width = 300,
         win_height = 100;
     if(!progress_win) {
@@ -68,6 +83,7 @@ void show_progress_win(const char *label) {
 }
 
 void hide_progress_win(void) {
+    if (!progress_win) { return; }
     progress_win->hide();
 }
 
@@ -79,7 +95,7 @@ int iip_scan::device_select(void) {
         status = sane_get_devices(&this->sane_devlist, SANE_FALSE);
         hide_progress_win();
         if(status != SANE_STATUS_GOOD) {
-            fl_message("iip_scan::device_select() - sane_get_devices() failed with: %s", sane_strstatus(status));
+            message_("iip_scan::device_select() - sane_get_devices() failed with: %s", sane_strstatus(status));
             return NG;
         }
     }
@@ -90,13 +106,21 @@ int iip_scan::device_select(void) {
     }
     switch(this->sane_num_devices) {
         case 0:
-            fl_message("SANE: no scanners found");
+            message_("%s", "SANE: no scanners found");
             return NG;
         case 1:
             this->device_name((char*)(this->sane_devlist[0]->name));
-            fl_message("using SANE device: '%s'", this->device_name());
+            message_("using SANE device: '%s'", this->device_name());
             break;
         default:
+            if (non_interactive_sw) {
+                // nobody to ask: keep a preset device, else the first one
+                if (!this->device_name()) {
+                    this->device_name((char*)(this->sane_devlist[0]->name));
+                }
+                message_("using SANE device: '%s'", this->device_name());
+                break;
+            }
             // let the user choose from a list
             int win_width = 500,
                 win_height = 300,
@@ -696,13 +720,13 @@ int iip_scan::read(void) {
 
     status = sane_start(this->sane_handle);
     if(status != SANE_STATUS_GOOD) {
-        fl_message("iip_scan::read() - sane_start() failed with: %s", sane_strstatus(status));
+        message_("iip_scan::read() - sane_start() failed with: %s", sane_strstatus(status));
         return NG;
     }
     do {
         status = sane_get_parameters(this->sane_handle, &param);
         if(status != SANE_STATUS_GOOD) {
-            fl_message("iip_scan::read() - sane_get_parameters() failed with: %s", sane_strstatus(status));
+            message_("iip_scan::read() - sane_get_parameters() failed with: %s", sane_strstatus(status));
             return NG;
         }
         if (ON == this->get_i_mv_sw()) {
@@ -751,7 +775,7 @@ int iip_scan::read(void) {
             status = sane_read(this->sane_handle, buffer, buffer_size, &read_len);
             if(status != SANE_STATUS_GOOD) {
                 if(status != SANE_STATUS_EOF) {
-                    fl_message("iip_scan::read() - sane_read() failed with: %s", sane_strstatus(status));
+                    message_("iip_scan::read() - sane_read() failed with: %s", sane_strstatus(status));
                     sane_cancel(this->sane_handle);
                     return NG;
                 }

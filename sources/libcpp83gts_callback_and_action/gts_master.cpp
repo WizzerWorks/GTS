@@ -4,6 +4,7 @@
 #include "gts_file_path.h"
 #include "gts_master.h"
 #include "gts_gui.h"
+#include "gts_rest_api.h"
 
 gts_master::gts_master(
 	const char *const app_name
@@ -16,6 +17,9 @@ gts_master::gts_master(
 	,_cp_release_name(app_name)
 	,_cp_release_date(rele_date)
 	,_cp_release_number(rele_num)
+	,_api_port(0)
+	,_api_host("127.0.0.1")
+	,_headless(false)
 	,_i_enable_act_menu_sw(ON)
 	,_i_enable_act_key_event_sw(OFF)
 {
@@ -94,6 +98,16 @@ const char *const gts_master::cp_release_number( void ) const
 	return (e == FL_SHORTCUT); // eat all keystrokes
 }***/
 
+/* POST /shutdown: close all windows so that Fl::run() returns */
+static void poll_api_quit_( void *vp )
+{
+	if (static_cast<gts_rest_api*>(vp)->quit_requested()) {
+		while (Fl::first_window()) { Fl::first_window()->hide(); }
+	} else {
+		Fl::repeat_timeout( 0.2 ,poll_api_quit_ ,vp );
+	}
+}
+
 int gts_master::exec( const char *comm )
 {
 	if (ON == this->i_mv_sw()) {
@@ -165,9 +179,17 @@ int gts_master::exec( const char *comm )
 
 	/* fltk windowのうちmain画面は必ず表示する */
 	/* set_non_model()は始めにshowしたwindowがメイン */
-	cl_gts_gui.window_main_view->show();
-	cl_gts_gui.window_main_view->wait_for_expose();
-	Fl::flush();
+#ifndef _WIN32
+	/* headless: no dialog may block (nobody can close it) */
+	iip_scan::set_non_interactive( this->headless() );
+#endif
+
+	/* headless: windows are created but never shown */
+	if (!this->headless()) {
+		cl_gts_gui.window_main_view->show();
+		cl_gts_gui.window_main_view->wait_for_expose();
+		Fl::flush();
+	}
 
 	/* trace paramsのguiを配列で利用するための変数初期設定 */
 	this->cl_trace_params.init_widget_set();
@@ -191,7 +213,8 @@ int gts_master::exec( const char *comm )
 	this->cl_trace_params.cb_hue_minmax_init_editor(0);
 
 	/* desktop.txtによる fltk window位置とサイズを復元 */
-	if (OK != this->cl_memo_desktop.load()) {
+	/* (loading it shows the windows, so not for headless) */
+	if (!this->headless() && OK != this->cl_memo_desktop.load()) {
 		pri_funct_err_bttvr(
 	 "Error : this->cl_memo_desktop.load() returns NG" );
 		return NG;
@@ -229,5 +252,35 @@ int gts_master::exec( const char *comm )
 	/*------------------------------------------------*/
 	/* fltkイベントループ */
 
-	return Fl::run();
+	/* REST API server.
+	Never deleted: cb_quit() calls exit(), and a running server thread
+	must not be destroyed by static destruction. */
+	gts_rest_api *api = nullptr;
+	if (0 < this->_api_port) {
+		Fl::lock(); /* enables Fl::awake() from the server thread */
+		api = new gts_rest_api;
+		std::string err;
+		if (!api->start(
+			this->_api_host ,this->_api_port ,this->_api_token ,err
+		)) {
+			pri_funct_err_bttvr( "Error : REST API : %s" ,err.c_str() );
+			return NG;
+		}
+		pri_funct_msg_ttvr( "REST API listening on %s:%d"
+			,this->_api_host.c_str() ,this->_api_port );
+	}
+
+	int ret = 0;
+	if (this->headless()) {
+		while (!api->quit_requested()) { Fl::wait(0.1); }
+	}
+	else {
+		if (api != nullptr) {
+			Fl::add_timeout(0.2 ,poll_api_quit_ ,api);
+		}
+		ret = Fl::run();
+	}
+
+	if (api != nullptr) { api->stop(); }
+	return ret;
 }

@@ -24,6 +24,35 @@ Please refer to the [OpenToonz site](https://opentoonz.github.io/e/index.html).
 
 Execute "./gts" in the unzipped folder.
 
+## REST API (Linux / macOS)
+
+GTS can serve a REST API (built on the bundled [cpp-httplib](https://github.com/yhirose/cpp-httplib), MIT). It is off by default.
+
+```
+gts -api-port 8080                    # GUI plus API, listening on 127.0.0.1
+gts -api-port 8080 -headless          # no windows (needs an X display connection)
+gts -api-port 8080 -api-token SECRET  # require "Authorization: Bearer SECRET"
+gts -api-port 8080 -api-host 0.0.0.0  # listen on all interfaces (use a token!)
+```
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/version` | name, version, date |
+| GET | `/api/v1/status` | `{"state":"idle"}` or `"busy"` |
+| GET | `/api/v1/scanners` | scanners found by SANE |
+| GET | `/api/v1/config` | current settings, as `text/plain` in the GTS config file format |
+| PUT | `/api/v1/config` | load settings (same format as GET returns) |
+| POST | `/api/v1/scan` | scan with the current settings, body `{"path":"/full/path/out.tif"}` |
+| POST | `/api/v1/shutdown` | quit GTS |
+
+```
+curl localhost:8080/api/v1/config > my.cfg
+curl -X PUT --data-binary @my.cfg localhost:8080/api/v1/config
+curl -X POST -d '{"path":"/tmp/scan.tif"}' localhost:8080/api/v1/scan
+```
+
+Errors are `{"error":"..."}` with a 4xx/5xx status. `POST /scan` and `PUT /config` return 409 while another is running. The API has no encryption; keep it on localhost or behind a reverse proxy. In `-headless` mode GTS never opens dialogs (messages go to stderr), and the first scanner found is used.
+
 ## How to Build with CMake (Linux / macOS)
 
 Requires libtiff, GLEW, FLTK (`fltk-config`), OpenGL/GLU and SANE (`sane-backends`) development packages. The autoconf build (`./autogen.sh && ./configure && make`) is still supported.

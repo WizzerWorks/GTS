@@ -190,6 +190,8 @@ class iip_scan {
         /* access to the scanner */
         int open(void);
         int device_select(void);
+        /* true: never open dialogs (headless / REST API) */
+        static void set_non_interactive(const bool sw);
         int setup_unit(void);
         void option_get_info();
         void* option_get_value(ScannerOption *option);
