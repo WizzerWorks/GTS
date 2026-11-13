@@ -51,7 +51,7 @@ curl -X PUT --data-binary @my.cfg localhost:8080/api/v1/config
 curl -X POST -d '{"path":"/tmp/scan.tif"}' localhost:8080/api/v1/scan
 ```
 
-Errors are `{"error":"..."}` with a 4xx/5xx status. `POST /scan` and `PUT /config` return 409 while another is running. The API has no encryption; keep it on localhost or behind a reverse proxy. In `-headless` mode GTS never opens dialogs (messages go to stderr), and the first scanner found is used.
+Errors are `{"error":"..."}` with a 4xx/5xx status. `POST /scan` and `PUT /config` return 409 while another is running. The API has no encryption; keep it on localhost or behind a reverse proxy. In `-headless` mode GTS never opens dialogs (messages go to stderr), and the first scanner found is used. On Windows (TWAIN) `/scanners` lists the installed TWAIN sources (names only), the default source is used, and headless mode uses a hidden parent window for TWAIN. The Windows support is untested; it is built by `one_step_build_vc2017.bat` (cpp-httplib needs `ws2_32.lib`, already added).
 
 ## How to Build with CMake (Linux / macOS)
 

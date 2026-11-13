@@ -228,8 +228,13 @@ int gts_master::exec( const char *comm )
 	/* window TWAINのためにウインドウハンドルを設定する */
 
 #if defined _WIN32
+	/* headless: the main window is never shown, so it has no handle.
+	TWAIN still needs a parent window: use a hidden one. */
 	cl_gts_master.cl_iip_scan.set_hw_parent(
-		fl_xid( cl_gts_gui.window_main_view )
+		this->headless()
+		? CreateWindowExA( 0, "STATIC", "GTS", WS_POPUP,
+			0, 0, 0, 0, NULL, NULL, GetModuleHandle(NULL), NULL )
+		: fl_xid( cl_gts_gui.window_main_view )
 	);
 #endif
 
@@ -257,6 +262,9 @@ int gts_master::exec( const char *comm )
 	must not be destroyed by static destruction. */
 	gts_rest_api *api = nullptr;
 	if (0 < this->_api_port) {
+		/* Fl::awake() needs the display (Windows: FLTK's message window)
+		even when no window is shown */
+		fl_open_display();
 		Fl::lock(); /* enables Fl::awake() from the server thread */
 		api = new gts_rest_api;
 		std::string err;

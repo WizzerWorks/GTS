@@ -20,12 +20,14 @@ INCS =\
 /I..\lib_util\
 /I..\libc12pri\
 /I$(DPATH_TWAIN)\
+/I$(DPATH_HTTPLIB)\
 /I$(DPATH_FLTK)\
 /I$(DPATH_GLEW)\include
 SRCS =\
 gts_file_path.cpp\
 gts_gui.cpp\
 gts_master.cpp\
+gts_rest_api.cpp\
 cb_area_and_rot90.cpp\
 cb_change_view.cpp\
 cb_color_trace_view_area.cpp\
@@ -68,6 +70,7 @@ DPATH_3RD_PARTY = ..\..\thirdparty
 DPATH_FLTK = $(DPATH_3RD_PARTY)\fltk\fltk-1.3.4-2
 DPATH_GLEW = $(DPATH_3RD_PARTY)\glew\glew-2.1.0
 DPATH_TWAIN = $(DPATH_3RD_PARTY)\twain\twain-2.3
+DPATH_HTTPLIB = $(DPATH_3RD_PARTY)\cpp-httplib
 DPATH_APPL = ..\..\build
 DPATH_LIBR = $(DPATH_APPL)\lib
 DPATH_OBJE = $(DPATH_APPL)\obj\$(NAME)

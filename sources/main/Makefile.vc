@@ -45,7 +45,7 @@ $(DPATH_TIFF)\libtiff\libtiff.lib\
 $(DPATH_FLTK)\lib\fltk.lib\
 $(DPATH_FLTK)\lib\fltkgl.lib\
 $(DPATH_GLEW)\lib\Release\Win32\glew32s.lib\
-glu32.lib advapi32.lib shlwapi.lib opengl32.lib comctl32.lib wsock32.lib\
+glu32.lib advapi32.lib shlwapi.lib opengl32.lib comctl32.lib wsock32.lib ws2_32.lib\
 user32.lib gdi32.lib shell32.lib ole32.lib comdlg32.lib
 #------
 TARG_CON = $(APPLICATION_NAME)_console.exe

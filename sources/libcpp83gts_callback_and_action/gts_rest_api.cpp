@@ -1,3 +1,13 @@
+#ifdef _WIN32
+/* before anything includes <windows.h>: winsock2 only, no min/max macros */
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
+# ifndef NOMINMAX
+#  define NOMINMAX
+# endif
+#endif
+#include "httplib.h"
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -7,13 +17,13 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <vector>
 #include <FL/Fl.H>
 #ifdef _WIN32
 # include <io.h>
 #else
 # include <unistd.h>
 #endif
-#include "httplib.h"
 #include "ptbl_returncode.h"
 #include "pri.h"
 #include "gts_gui.h"
@@ -252,6 +262,14 @@ void gts_rest_api::impl::setup_routes()
 					+ ",\"vendor\":" + json_str_(dev[ii]->vendor)
 					+ ",\"model\":" + json_str_(dev[ii]->model)
 					+ ",\"type\":" + json_str_(dev[ii]->type) + "}";
+			}
+#else
+			/* TWAIN: only the driver name is known */
+			std::vector<std::string> names;
+			(void)cl_gts_master.cl_iip_scan.get_source_names(names);
+			for (std::size_t ii = 0; ii < names.size(); ++ii) {
+				if (ii > 0) { body += ","; }
+				body += "{\"name\":" + json_str_(names[ii]) + "}";
 			}
 #endif
 		});

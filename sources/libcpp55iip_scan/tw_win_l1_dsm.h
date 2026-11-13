@@ -1,6 +1,8 @@
 #ifndef __tw_win_l1_dsm_h__
 #define __tw_win_l1_dsm_h__
 
+#include <string>
+#include <vector>
 #include <windows.h> /* for twain.h */
 #include "twain.h"
 
@@ -48,6 +50,9 @@ public:
 	int  get_i_cv_sw( void ) { return this->_i_cv_sw; }
 
 	void set_hw_parent( HWND hw ) { this->_hw_parent = hw; }
+
+	/* names of the installed sources(scanner drivers) */
+	int get_source_names( std::vector<std::string>& names );
 
 	char *get_cp_machine_type( void )
 	{ return this->_SourceID.ProductName; }

@@ -30,6 +30,7 @@ case "$host" in
         on_windows=yes
         CFLAGS="$CFLAGS -D_WIN32"
         CXXFLAGS="$CXXFLAGS -D_WIN32"
+        LIBS="$LIBS -lws2_32"
     ;;
     *darwin*)
         on_macos=yes

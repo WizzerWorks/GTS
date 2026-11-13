@@ -156,6 +156,7 @@ libgts_la_CPPFLAGS += -Ithirdparty/twain/twain-2.3
 libgts_la_SOURCES += \
 					 sources/libcpp55iip_scan/tw_win_l1_dsm_entry.cpp \
 					 sources/libcpp55iip_scan/tw_win_l1_dsm_get_cc.cpp \
+					 sources/libcpp55iip_scan/tw_win_l1_dsm_get_source_names.cpp \
 					 sources/libcpp55iip_scan/tw_win_l1_dsm_init_tw_id.cpp \
 					 sources/libcpp55iip_scan/tw_win_l1_dsm_pri_cc.cpp \
 					 sources/libcpp55iip_scan/tw_win_l1_dsm_pri_error.cpp \

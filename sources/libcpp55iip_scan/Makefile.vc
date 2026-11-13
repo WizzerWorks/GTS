@@ -13,6 +13,7 @@ INCS =\
 SRCS =\
 tw_win_l1_dsm_entry.cpp\
 tw_win_l1_dsm_get_cc.cpp\
+tw_win_l1_dsm_get_source_names.cpp\
 tw_win_l1_dsm_init_tw_id.cpp\
 tw_win_l1_dsm_pri_cc.cpp\
 tw_win_l1_dsm_pri_error.cpp\

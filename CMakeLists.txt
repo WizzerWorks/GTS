@@ -212,6 +212,7 @@ if(WIN32)
   list(APPEND GTS_SOURCES
     sources/libcpp55iip_scan/tw_win_l1_dsm_entry.cpp
     sources/libcpp55iip_scan/tw_win_l1_dsm_get_cc.cpp
+    sources/libcpp55iip_scan/tw_win_l1_dsm_get_source_names.cpp
     sources/libcpp55iip_scan/tw_win_l1_dsm_init_tw_id.cpp
     sources/libcpp55iip_scan/tw_win_l1_dsm_pri_cc.cpp
     sources/libcpp55iip_scan/tw_win_l1_dsm_pri_error.cpp
@@ -301,6 +302,7 @@ target_link_libraries(gts_lib PUBLIC
 
 if(WIN32)
   target_include_directories(gts_lib PUBLIC thirdparty/twain/twain-2.3)
+  target_link_libraries(gts_lib PUBLIC ws2_32)  # REST API (cpp-httplib)
 else()
   target_link_libraries(gts_lib PUBLIC PkgConfig::SANE)
 endif()
