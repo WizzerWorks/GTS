@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <cctype>
+#include <string>
 #include <FL/Fl.H>
 #include <FL/fl_ask.H>
 #include <FL/Fl_Window.H>
@@ -114,7 +116,17 @@ int iip_scan::device_select(void) {
             break;
         default:
             if (non_interactive_sw) {
-                // nobody to ask: keep a preset device, else the first one
+                // nobody to ask: keep a preset device, else the one named
+                // by SANE_DEFAULT_DEVICE, else the first one
+                if (!this->device_name()) {
+                    const char *want = getenv("SANE_DEFAULT_DEVICE");
+                    for (int k = 0; want && this->sane_devlist[k]; k++) {
+                        if (!strcmp(want, this->sane_devlist[k]->name)) {
+                            this->device_name((char*)(this->sane_devlist[k]->name));
+                            break;
+                        }
+                    }
+                }
                 if (!this->device_name()) {
                     this->device_name((char*)(this->sane_devlist[0]->name));
                 }
@@ -242,6 +254,8 @@ void iip_scan::option_get_info() {
     this->_option_info.y_resolution.desc = NULL;
     this->_option_info.mode.num = -1;
     this->_option_info.mode.desc = NULL;
+    this->_option_info.source.num = -1;
+    this->_option_info.source.desc = NULL;
     this->_option_info.threshold.num = -1;
     this->_option_info.threshold.desc = NULL;
     this->_option_info.brightness.num = -1;
@@ -285,6 +299,9 @@ void iip_scan::option_get_info() {
         } else if(!strcmp(option->name, SANE_NAME_SCAN_MODE)) {
             this->_option_info.mode.num = i;
             this->_option_info.mode.desc = option;
+        } else if(!strcmp(option->name, SANE_NAME_SCAN_SOURCE)) {
+            this->_option_info.source.num = i;
+            this->_option_info.source.desc = option;
         } else if(!strcmp(option->name, SANE_NAME_THRESHOLD)) {
             this->_option_info.threshold.num = i;
             this->_option_info.threshold.desc = option;
@@ -426,6 +443,13 @@ void iip_scan::option_set_value(ScannerOption *option, void *value) {
 
     if(!(option->desc->cap & SANE_CAP_SOFT_SELECT)) {
         pri_funct_msg_v("SANE option '%s' can not be set\n", option->desc->name);
+        return;
+    }
+
+    // An inactive option must not be set (SANE API). Some backends (escl)
+    // report garbage ranges for them and misbehave when they are set.
+    if(option->desc->cap & SANE_CAP_INACTIVE) {
+        pri_funct_msg_v("SANE option '%s' is inactive, not set\n", option->desc->name);
         return;
     }
 
@@ -578,6 +602,83 @@ SANE_String_Const pixeltype_to_sane_mode(E_PIXELTYPE pixeltype) {
     return mode;
 }
 
+void iip_scan::select_flatbed_source(void) {
+    const ScannerOption *src = &this->_option_info.source;
+    if(src->num == -1 || src->desc == NULL
+    || src->desc->type != SANE_TYPE_STRING
+    || src->desc->constraint_type != SANE_CONSTRAINT_STRING_LIST) {
+        return; // no source to choose from
+    }
+    for(const SANE_String_Const *name = src->desc->constraint.string_list; *name; name++) {
+        std::string low(*name);
+        for(size_t k = 0; k < low.size(); k++) {
+            low[k] = (char)tolower((unsigned char)low[k]);
+        }
+        if(low.find("flatbed") != std::string::npos
+        || low.find("platen") != std::string::npos) {
+            // the value buffer must be as large as the option says
+            std::string buf(*name);
+            buf.resize(src->desc->size > 0 ? src->desc->size : buf.size() + 1, '\0');
+            this->option_set_value(&this->_option_info.source, (void*)buf.c_str());
+            return;
+        }
+    }
+}
+
+/* The backend's own spelling of a mode that matches one of the names
+(case-insensitive), or NULL */
+static SANE_String_Const find_mode_(const SANE_String_Const *list, const char *const *names) {
+    for(const SANE_String_Const *item = list; *item; item++) {
+        std::string low(*item);
+        for(size_t k = 0; k < low.size(); k++) {
+            low[k] = (char)tolower((unsigned char)low[k]);
+        }
+        for(const char *const *nm = names; *nm; nm++) {
+            if(low == *nm) {
+                return *item;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* Set the scan mode. A device may not offer the wanted one (many
+scanners have no Lineart): use the nearest it has. read() converts the
+data it gets to the wanted pixel type. */
+void iip_scan::select_mode(void) {
+    SANE_String_Const want = pixeltype_to_sane_mode(this->e_pixeltype());
+    const ScannerOption *m = &this->_option_info.mode;
+    if(m->num == -1 || m->desc == NULL
+    || m->desc->type != SANE_TYPE_STRING
+    || m->desc->constraint_type != SANE_CONSTRAINT_STRING_LIST) {
+        this->option_set_value(&this->_option_info.mode, (void*)want);
+        return;
+    }
+
+    static const char *const lineart[] = {"lineart", "binary", NULL};
+    static const char *const gray[]    = {"gray", "grey", "grayscale", NULL};
+    static const char *const color[]   = {"color", "colour", "rgb", NULL};
+    const char *const *order[3];
+    switch(this->e_pixeltype()) {
+        case E_PIXELTYPE_BW:        order[0] = lineart; order[1] = gray;  order[2] = color; break;
+        case E_PIXELTYPE_GRAYSCALE: order[0] = gray;    order[1] = color; order[2] = NULL;  break;
+        default:                    order[0] = color;   order[1] = gray;  order[2] = NULL;  break;
+    }
+    for(int k = 0; k < 3 && order[k]; k++) {
+        SANE_String_Const name = find_mode_(m->desc->constraint.string_list, order[k]);
+        if(name) {
+            if(strcmp(name, want) != 0) {
+                pri_funct_msg_v("scanner has no mode '%s', using '%s'\n", want, name);
+            }
+            std::string buf(name);
+            buf.resize(m->desc->size > 0 ? m->desc->size : buf.size() + 1, '\0');
+            this->option_set_value(&this->_option_info.mode, (void*)buf.c_str());
+            return;
+        }
+    }
+    this->option_set_value(&this->_option_info.mode, (void*)want);
+}
+
 int iip_scan::setup_action(void) {
     if (ON == this->get_i_mv_sw()) {
         pri_funct_msg_ttvr("iip_scan::setup_action()");
@@ -586,11 +687,14 @@ int iip_scan::setup_action(void) {
     const SANE_Option_Descriptor *option;
     void *value;
     SANE_Int i;
-    SANE_String_Const mode = pixeltype_to_sane_mode(this->e_pixeltype());
     SANE_Word word_value;
 
+    // set source: the flatbed. A device may default to its document
+    // feeder, and then the scan fails with "Document feeder out of documents"
+    this->select_flatbed_source();
+
     // set mode
-    this->option_set_value(&this->_option_info.mode, (void*)mode);
+    this->select_mode();
 
     // set resolution
     if(this->_option_info.x_resolution.num != -1 && this->_option_info.y_resolution.num != -1) {
@@ -736,9 +840,24 @@ int iip_scan::read(void) {
             pri_funct_msg_ttvr("param.lines = %d", param.lines);
             pri_funct_msg_ttvr("param.depth = %d", param.depth);
         }
-        if(!(param.format == SANE_FRAME_GRAY || param.format == SANE_FRAME_RGB)) {
+        // what the device really sends (it may differ from the pixel type
+        // asked for, see select_mode()); it is converted below
+        enum { SRC_BIT, SRC_GRAY8, SRC_RGB8 } src;
+        if(param.format == SANE_FRAME_GRAY && param.depth == 1) {
+            src = SRC_BIT;
+        } else if(param.format == SANE_FRAME_GRAY && param.depth == 8) {
+            src = SRC_GRAY8;
+        } else if(param.format == SANE_FRAME_RGB && param.depth == 8) {
+            src = SRC_RGB8;
+        } else {
             // TODO: support the rest
-            pri_funct_msg_v("Error: unsupported SANE frame format %d.\n", param.format);
+            pri_funct_msg_v("Error: unsupported SANE frame format %d, depth %d.\n", param.format, param.depth);
+            sane_cancel(this->sane_handle);
+            return NG;
+        }
+        if(src == SRC_BIT && param.pixels_per_line % CHAR_BIT != 0) {
+            // rows are padded to whole bytes, not handled
+            pri_funct_msg_v("Error: 1-bit scan with a width that is not a multiple of 8 is not supported.\n");
             sane_cancel(this->sane_handle);
             return NG;
         }
@@ -784,14 +903,14 @@ int iip_scan::read(void) {
 
             // write it to the canvas
             written = 0;
-            switch(this->_e_pixeltype) {
-                case E_PIXELTYPE_BW:
+            switch(src) {
+                case SRC_BIT:
                     read_len_pixels = read_len * CHAR_BIT;
                     break;
-                case E_PIXELTYPE_GRAYSCALE:
+                case SRC_GRAY8:
                     read_len_pixels = read_len;
                     break;
-                case E_PIXELTYPE_RGB:
+                default: // SRC_RGB8
                     read_len_pixels = read_len / 3;
                     break;
             }
@@ -805,22 +924,50 @@ int iip_scan::read(void) {
                     }
 
                     if(read_len_pixels) {
+                        // the pixel as the device sent it ...
+                        SANE_Byte gray = 0, rgb[3] = {0, 0, 0};
+                        int raw_bit = 0;
+                        switch(src) {
+                            case SRC_BIT:
+                                // first pixel in the highest bit
+                                bit_in_pos = CHAR_BIT - 1 - written % CHAR_BIT;
+                                raw_bit = (buffer[written / CHAR_BIT] >> bit_in_pos) & 1;
+                                // 1 is black
+                                gray = raw_bit ? 0 : 255;
+                                break;
+                            case SRC_GRAY8:
+                                gray = buffer[written];
+                                break;
+                            default: // SRC_RGB8
+                                memcpy(rgb, buffer + written * 3, 3);
+                                gray = (SANE_Byte)((299 * rgb[0] + 587 * rgb[1] + 114 * rgb[2]) / 1000);
+                                break;
+                        }
+                        // ... written as the wanted pixel type
                         switch(this->_e_pixeltype) {
                             case E_PIXELTYPE_BW:
-                                // time for bit twiddling
-                                byte_out_pos = (y * param.pixels_per_line + x) / CHAR_BIT;
-                                bit_out_pos = (y * param.pixels_per_line + x) % CHAR_BIT;
-                                byte_in_pos = written / CHAR_BIT;
-                                bit_in_pos = written % CHAR_BIT;
-                                // we need to flip the value because we get a negative image from the scanner
-                                bit_in_is_set = 1 - ((buffer[byte_in_pos] >> bit_in_pos) & 1);
-                                ((SANE_Byte*)canvas)[byte_out_pos] ^= (-bit_in_is_set ^ ((SANE_Byte*)canvas)[byte_out_pos]) & (1 << bit_out_pos);
+                                // The canvas stores a row in whole bytes, the
+                                // first pixel in the highest bit, 1 is white.
+                                // A 1-bit device sends a negative image
+                                // (1 is black); else use the threshold.
+                                bit_in_is_set = (src == SRC_BIT) ? (1 - raw_bit)
+                                              : (gray >= (int)this->_d_threshold ? 1 : 0);
+                                byte_out_pos = y * ((param.pixels_per_line + CHAR_BIT - 1) / CHAR_BIT) + x / CHAR_BIT;
+                                bit_out_pos = 0x80 >> (x % CHAR_BIT);
+                                if(bit_in_is_set) {
+                                    ((SANE_Byte*)canvas)[byte_out_pos] |= bit_out_pos;
+                                } else {
+                                    ((SANE_Byte*)canvas)[byte_out_pos] &= ~bit_out_pos;
+                                }
                                 break;
                             case E_PIXELTYPE_GRAYSCALE:
-                                ((SANE_Byte*)canvas)[y * param.pixels_per_line + x] = buffer[written];
+                                ((SANE_Byte*)canvas)[y * param.pixels_per_line + x] = gray;
                                 break;
                             case E_PIXELTYPE_RGB:
-                                memcpy((SANE_Byte*)canvas + y * param.pixels_per_line * 3 + x * 3, buffer + written * 3, 3);
+                                if(src != SRC_RGB8) {
+                                    rgb[0] = rgb[1] = rgb[2] = gray;
+                                }
+                                memcpy((SANE_Byte*)canvas + y * param.pixels_per_line * 3 + x * 3, rgb, 3);
                                 break;
                         }
                         written++;

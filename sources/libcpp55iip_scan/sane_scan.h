@@ -25,6 +25,7 @@ typedef struct {
     ScannerOption x_resolution;
     ScannerOption y_resolution;
     ScannerOption mode;
+    ScannerOption source;
     ScannerOption threshold;
     ScannerOption brightness;
     ScannerOption contrast;
@@ -190,6 +191,8 @@ class iip_scan {
         /* access to the scanner */
         int open(void);
         int device_select(void);
+        void select_flatbed_source(void);
+        void select_mode(void);
         /* true: never open dialogs (headless / REST API) */
         static void set_non_interactive(const bool sw);
         int setup_unit(void);
